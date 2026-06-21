@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import jwt from 'jsonwebtoken';
 
 const generateAccessAndRefereshTokens = async (userId) => {
   try {
@@ -76,18 +77,24 @@ const registerUser = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
 
-  if (!username || !email) {
+  if (!(username || email)) {
     throw new ApiError(400, "username or email is required");
   }
 
+ 
   const user = await User.findOne({
-    $or: [{ username }, { email }],
-  });
-  if (!user) {
-    throw new ApiError(400, "user does not exist");
-  }
+  $or: [{ username }, { email }],
+}).select("+password");
 
-  const isPasswordValid = await user.isPasswordCorrect(password);
+console.log("User:", user);
+
+if (!user) {
+  throw new ApiError(400, "user does not exist");
+}
+
+const isPasswordValid = await user.isPasswordCorrect(password);
+
+  console.log('isPasswordValid', isPasswordValid)
 
   if (!isPasswordValid) {
     throw new ApiError(401, "Invalid user credentails");
@@ -101,9 +108,9 @@ const loginUser = asyncHandler(async (req, res) => {
     "-password  -refreshToken"
   );
 
-  const optiions = {
+  const options = {
     httpOnly: true,
-    secure: true,
+    secure: false,
   };
 
   return res
@@ -136,9 +143,9 @@ const logoutUser = asyncHandler(async (req, res) => {
     }
   );
 
-  const optiions = {
+  const options = {
     httpOnly: true,
-    secure: true,
+    secure: false,
   };
 
   return res
@@ -148,4 +155,55 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "User logged Out Successfully "));
 });
 
-export { registerUser, loginUser, logoutUser };
+
+const refreshAccessToken = asyncHandler(async(req, res)=>{
+
+  const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken;
+
+ if(!incomingRefreshToken){
+  throw new ApiError(401, "unauthorized request")
+ }
+
+ try {
+  const decodedToken =  jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET)
+ 
+  const user = await User.findById(decodedToken?._id)
+ 
+  if(!user){
+    throw new ApiError(401, "invalid refresh Token")
+  }
+ 
+  if(incomingRefreshToken !== user?.refreshToken){
+    throw new ApiError(401, "Refersh Token is expired or used")
+  }
+   
+  const options={
+   httpOnly:true,
+   secure:false
+  }
+   
+  const {accessToken, newRrefreshToken} = await generateAccessAndRefereshTokens(user._id)
+ 
+  return res
+  .status(200)
+  .cookie("accessToken", accessToken, options)
+  .cookie("refreshToken",newRrefreshToken, options)
+  .json(
+   new ApiResponse(
+     200,
+     {accessToken, refreshToken: newRrefreshToken},
+     "Access Token refeshed"
+   )
+  )
+ 
+ 
+ } catch (error) {
+   throw new ApiError(401, error?.message || "Invalid refesh Token")
+ }
+})
+
+
+
+
+
+export { registerUser, loginUser, logoutUser, refreshAccessToken };
