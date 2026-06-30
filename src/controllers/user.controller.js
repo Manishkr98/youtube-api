@@ -297,83 +297,75 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "coverImage is updated successfully "));
 });
 
-
-const getUserChannelProfile = asyncHandler(async(req, res)=>{
-const {username} = req.params
-if(!username?.trim()){
-  throw new ApiError(400, 'username is missing')
-}
-
-const channel = await User.aggregate([
-  {
-    $match:{
-      username: username?.toLowerCase()
-    }
-  },
-  {
-    $lookup:{
-      from: "subcriptions",
-      foreignField:"channel",
-      localField:"_id",
-      as:"subcriptions"
-    }
-  },
-  {
-    $lookup:{
-      from: "subcriptions",
-      foreignField:"subscriber",
-      localField:"_id",
-      as:"subscribedTo"
-    }
-  },
-  {
-    $addFields:{
-      subcribersCount:{
-        $size: "$subscribers"
-      },
-      channelToSubscribedToCount:{
-        $size: "$subscribedTo"
-      },
-      isSubcribed:{
-        $count:{
-          if:{$in:[req.user?._id, "subscribers.subscriber"]},
-          then:true,
-          else:false
-        }
-      }
-    }
-  },
-  {
-    $project:{
-      fullname: 1,
-      username: 1,
-      subcribersCount: 1,
-      channelToSubscribedToCount: 1,
-      isSubcribed:1,
-      avatar:1,
-      coverImage: 1,
-      email:1,
-    }
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  if (!username?.trim()) {
+    throw new ApiError(400, "username is missing");
   }
-])
 
-if(!channel?.length()){
-  throw new ApiError(404, 'channel does not exists')
-}
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username: username?.toLowerCase(),
+      },
+    },
+    {
+      $lookup: {
+        from: "subcriptions",
+        foreignField: "channel",
+        localField: "_id",
+        as: "subcriptions",
+      },
+    },
+    {
+      $lookup: {
+        from: "subcriptions",
+        foreignField: "subscriber",
+        localField: "_id",
+        as: "subscribedTo",
+      },
+    },
+    {
+      $addFields: {
+        subcribersCount: {
+          $size: "$subscribers",
+        },
+        channelToSubscribedToCount: {
+          $size: "$subscribedTo",
+        },
+        isSubcribed: {
+          $count: {
+            if: { $in: [req.user?._id, "subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        fullname: 1,
+        username: 1,
+        subcribersCount: 1,
+        channelToSubscribedToCount: 1,
+        isSubcribed: 1,
+        avatar: 1,
+        coverImage: 1,
+        email: 1,
+      },
+    },
+  ]);
 
-return res
-.res.status(200)
-.json(
-  new ApiResponse(200, channel[0], 'User channel fetched Successfully')
-)
+  if (!channel?.length()) {
+    throw new ApiError(404, "channel does not exists");
+  }
 
-
-})
-
-
-
-
-
+  return res.res
+    .status(200)
+    .json(
+      new ApiResponse(200, channel[0], "User channel fetched Successfully")
+    );
+});
 
 export {
   registerUser,
@@ -385,18 +377,5 @@ export {
   updateUserAvatar,
   updateUserCoverImage,
   changeCurrentPassword,
-  getUserChannelProfile
+  getUserChannelProfile,
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
